@@ -1,0 +1,9 @@
+# Live test configuration — copy to live_tests.conf and fill in values.
+# live_tests.conf is gitignored and will not be committed.
+
+LIVE_NAMESERVER="10.0.0.1"
+LIVE_KEYFILE="/path/to/tsig.key"
+LIVE_DOMAIN="test.example.com"
+LIVE_PTR_NET="10.99.99"
+LIVE_PTR6_PREFIX="2001:db8:1:2:3:4"
+LIVE_INTERFACE="en0"

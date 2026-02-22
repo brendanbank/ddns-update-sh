@@ -2,4 +2,5 @@
 *.private
 *.swp
 *.log
+*.conf
 .DS_Store

@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 #
-# Test suite for ddns-update.sh
-#
-# Runs offline tests that validate option parsing, IP address validation,
-# IPv6 expansion, and reverse-IP generation.  Does NOT require a live DNS
-# server or valid TSIG key — all nsupdate/dig calls are stubbed out.
-#
-# Usage:  ./tests/run_tests.sh
-#
 # BSD 2-Clause "Simplified" License
 #
 # Copyright (c) 2024, Brendan Bank
@@ -33,6 +25,14 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Test suite for ddns-update.sh
+#
+# Runs offline tests that validate option parsing, IP address validation,
+# IPv6 expansion, and reverse-IP generation.  Does NOT require a live DNS
+# server or valid TSIG key — all nsupdate/dig calls are stubbed out.
+#
+# Usage:  ./tests/run_tests.sh
 
 set -uo pipefail
 
@@ -151,6 +151,21 @@ assert_eq "Valid IPv6 (::1) returns 1" "1" "$rc"
 checkipaddress "not:an:ipv6" 6 >/dev/null 2>&1; rc=$?
 assert_eq "Invalid IPv6 (not:an:ipv6) returns 0" "0" "$rc"
 
+checkipaddress "2001:4c3b:8d35:cafe:cafe:cafe::1" 6 >/dev/null 2>&1; rc=$?
+assert_eq "Valid IPv6 (2001:4c3b:8d35:cafe:cafe:cafe::1) returns 1" "1" "$rc"
+
+checkipaddress "2001:4c3b:8d35:cafe:cafe:cafe::2" 6 >/dev/null 2>&1; rc=$?
+assert_eq "Valid IPv6 (2001:4c3b:8d35:cafe:cafe:cafe::2) returns 1" "1" "$rc"
+
+checkipaddress "" 6 >/dev/null 2>&1; rc=$?
+assert_eq "Empty string IPv6 returns 0" "0" "$rc"
+
+checkipaddress "2001:db8::gggg" 6 >/dev/null 2>&1; rc=$?
+assert_eq "Invalid hex in IPv6 returns 0" "0" "$rc"
+
+checkipaddress "1234:5678:9abc:def0:1234:5678:9abc:def0" 6 >/dev/null 2>&1; rc=$?
+assert_eq "Full 8-group IPv6 returns 1" "1" "$rc"
+
 # ---------------------------------------------------------------------------
 # Test: hex2dec
 # ---------------------------------------------------------------------------
@@ -187,6 +202,17 @@ assert_eq "fe80::abcd:1234 expands" "fe80:0000:0000:0000:0000:0000:abcd:1234" "$
 result=$(expand_ipv6 "2001:0db8:0000:0000:0000:0000:0000:0001")
 assert_eq "Already full address unchanged" "2001:0db8:0000:0000:0000:0000:0000:0001" "$result"
 
+result=$(expand_ipv6 "2001:4c3b:8d35:cafe:cafe:cafe::1")
+assert_eq "2001:4c3b:8d35:cafe:cafe:cafe::1 expands" \
+    "2001:4c3b:8d35:cafe:cafe:cafe:0000:0001" "$result"
+
+result=$(expand_ipv6 "2001:4c3b:8d35:cafe:cafe:cafe::2")
+assert_eq "2001:4c3b:8d35:cafe:cafe:cafe::2 expands" \
+    "2001:4c3b:8d35:cafe:cafe:cafe:0000:0002" "$result"
+
+result=$(expand_ipv6 "::")
+assert_eq ":: expands to all zeros" "0000:0000:0000:0000:0000:0000:0000:0000" "$result"
+
 # ---------------------------------------------------------------------------
 # Test: reverseip4
 # ---------------------------------------------------------------------------
@@ -213,6 +239,21 @@ assert_eq "2001:db8::1 reverses" \
     "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa" \
     "$REVERSE_IP"
 
+reverseip6 "2001:4c3b:8d35:cafe:cafe:cafe::1"
+assert_eq "2001:4c3b:8d35:cafe:cafe:cafe::1 reverses" \
+    "1.0.0.0.0.0.0.0.e.f.a.c.e.f.a.c.e.f.a.c.5.3.d.8.b.3.c.4.1.0.0.2.ip6.arpa" \
+    "$REVERSE_IP"
+
+reverseip6 "2001:4c3b:8d35:cafe:cafe:cafe::2"
+assert_eq "2001:4c3b:8d35:cafe:cafe:cafe::2 reverses" \
+    "2.0.0.0.0.0.0.0.e.f.a.c.e.f.a.c.e.f.a.c.5.3.d.8.b.3.c.4.1.0.0.2.ip6.arpa" \
+    "$REVERSE_IP"
+
+reverseip6 "::"
+assert_eq ":: reverses to all-zero ip6.arpa" \
+    "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa" \
+    "$REVERSE_IP"
+
 # ---------------------------------------------------------------------------
 # Test: option parsing — missing required arguments
 # ---------------------------------------------------------------------------
@@ -227,6 +268,39 @@ assert_contains "Missing -n shows error" "NAMESERVER is empty" "$output"
 
 output=$("${DDNS}" -h test.example.com -n 10.0.0.1 2>&1 || true)
 assert_contains "Missing -k shows error" "KEYFILE is empty" "$output"
+
+# ---------------------------------------------------------------------------
+# Test: -I INTERFACE validation
+# ---------------------------------------------------------------------------
+echo ""
+echo "== Interface validation =="
+
+# Invalid interface should be rejected (dig/nsupdate will fail before reaching
+# the server, but the interface check itself runs first).
+output=$("${DDNS}" -h test.example.com -n 10.0.0.1 -k "${DUMMY_KEY}" -I nosuchif0 1.2.3.4 2>&1 || true)
+assert_contains "Invalid interface rejected" "Could not find INTERFACE" "$output"
+
+# Grab a real interface from the system to test acceptance
+if [ -x "$(type -P ifconfig)" ]; then
+    REAL_IF=$(ifconfig -l -u inet | awk '{print $1}')
+elif [ -x "$(type -P ip)" ]; then
+    REAL_IF=$(ip -o link show | awk -F': ' 'NR==1{print $2}')
+fi
+
+if [ ! -z "${REAL_IF:-}" ]; then
+    # With a valid interface the script should get past the interface check.
+    # It will fail later at dig/nsupdate (no real server), but should NOT
+    # complain about the interface.
+    output=$("${DDNS}" -h test.example.com -n 10.0.0.1 -k "${DUMMY_KEY}" -I "${REAL_IF}" 1.2.3.4 2>&1 || true)
+    TOTAL=$((TOTAL + 1))
+    if echo "$output" | grep -qF "Could not find INTERFACE"; then
+        echo "  FAIL: Valid interface (${REAL_IF}) should be accepted"
+        FAIL=$((FAIL + 1))
+    else
+        echo "  PASS: Valid interface (${REAL_IF}) accepted"
+        PASS=$((PASS + 1))
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Test: CNAME mutual exclusivity

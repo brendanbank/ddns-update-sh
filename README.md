@@ -125,12 +125,48 @@ Run every 5 minutes to keep a dynamic DNS record up to date:
 
 ## Running Tests
 
-The test suite validates option parsing, IP validation, IPv6 expansion, and
-reverse-IP generation without requiring a live DNS server:
+### Unit tests
+
+The unit test suite validates option parsing, IP validation, IPv6 expansion,
+reverse-IP generation, and interface checking without requiring a live DNS
+server:
 
 ```bash
 ./tests/run_tests.sh
 ```
+
+### Live integration tests
+
+The live test suite performs real DNS updates against a nameserver and verifies
+the results with `dig`. It covers A, AAAA, CNAME, PTR (IPv4 and IPv6) records,
+idempotency checks, force updates, deletes, and external IP auto-detection via
+`-I INTERFACE`.
+
+1. Copy the example config and fill in your values:
+
+```bash
+cp tests/live_tests.conf.example tests/live_tests.conf
+```
+
+2. Edit `tests/live_tests.conf` with your nameserver, TSIG key path, test
+   domain, reverse delegation prefixes, and network interface:
+
+```
+LIVE_NAMESERVER="10.0.0.1"
+LIVE_KEYFILE="/path/to/tsig.key"
+LIVE_DOMAIN="test.example.com"
+LIVE_PTR_NET="10.99.99"
+LIVE_PTR6_PREFIX="2001:db8:1:2:3:4"
+LIVE_INTERFACE="en0"
+```
+
+3. Run the tests:
+
+```bash
+./tests/live_tests.sh
+```
+
+The config file (`*.conf`) is gitignored and will not be committed.
 
 See [tests/README.md](tests/README.md) for details.
 

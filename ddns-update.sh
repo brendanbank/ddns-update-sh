@@ -1,27 +1,5 @@
 #!/usr/bin/env bash
 #
-# ddns-update.sh - Dynamic DNS update client using nsupdate
-#
-# Updates DNS resource records (A, AAAA, CNAME, PTR) on a BIND-compatible
-# nameserver using TSIG key authentication. Can auto-detect the external IP
-# address via http://ifconfig.me or accept one on the command line.
-#
-# Examples:
-#   # Update A record with auto-detected external IPv4:
-#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key
-#
-#   # Update AAAA record on a specific interface:
-#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -6 -I eth0
-#
-#   # Create a CNAME record:
-#   ddns-update.sh -h alias.example.com -c target.example.com -n 10.0.0.1 -k /path/to/key
-#
-#   # Set reverse PTR record:
-#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -r 1.2.3.4
-#
-#   # Delete an existing record:
-#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -D
-#
 # BSD 2-Clause "Simplified" License
 #
 # Copyright (c) 2024, Brendan Bank
@@ -47,6 +25,28 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# ddns-update.sh - Dynamic DNS update client using nsupdate
+#
+# Updates DNS resource records (A, AAAA, CNAME, PTR) on a BIND-compatible
+# nameserver using TSIG key authentication. Can auto-detect the external IP
+# address via http://ifconfig.me or accept one on the command line.
+#
+# Examples:
+#   # Update A record with auto-detected external IPv4:
+#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key
+#
+#   # Update AAAA record on a specific interface:
+#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -6 -I eth0
+#
+#   # Create a CNAME record:
+#   ddns-update.sh -h alias.example.com -c target.example.com -n 10.0.0.1 -k /path/to/key
+#
+#   # Set reverse PTR record:
+#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -r 1.2.3.4
+#
+#   # Delete an existing record:
+#   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -D
 
 script_name=$(basename "$0")
 
