@@ -1,0 +1,5 @@
+*.key
+*.private
+*.swp
+*.log
+.DS_Store
