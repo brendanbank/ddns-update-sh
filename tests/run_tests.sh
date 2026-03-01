@@ -315,6 +315,82 @@ output=$("${DDNS}" -h test.example.com -c target.example.com -n 10.0.0.1 -k "${D
 assert_contains "CNAME + positional IP rejected" "cannot be combined with a positional IP" "$output"
 
 # ---------------------------------------------------------------------------
+# Test: .env file loading
+# ---------------------------------------------------------------------------
+echo ""
+echo "== .env file loading =="
+
+# Create a temporary copy of the script so we can place a .env beside it
+ENV_TMPDIR=$(mktemp -d)
+trap 'rm -rf "${TMPDIR}" "${ENV_TMPDIR}"' EXIT
+cp "${DDNS}" "${ENV_TMPDIR}/ddns-update.sh"
+chmod +x "${ENV_TMPDIR}/ddns-update.sh"
+
+# Create a .env that supplies NAMESERVER and KEYFILE
+cat > "${ENV_TMPDIR}/.env" <<ENVEOF
+NAMESERVER=10.0.0.1
+KEYFILE=${DUMMY_KEY}
+ENVEOF
+
+# With .env present, -n and -k should no longer be required
+output=$("${ENV_TMPDIR}/ddns-update.sh" -h test.example.com 1.2.3.4 2>&1 || true)
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -qE "NAMESERVER is empty|KEYFILE is empty"; then
+    echo "  FAIL: .env should supply NAMESERVER and KEYFILE"
+    echo "        got: ${output}"
+    FAIL=$((FAIL + 1))
+else
+    echo "  PASS: .env supplies NAMESERVER and KEYFILE"
+    PASS=$((PASS + 1))
+fi
+
+# Command-line args should override .env values
+output=$("${ENV_TMPDIR}/ddns-update.sh" -h test.example.com -n notanip 1.2.3.4 2>&1 || true)
+assert_contains ".env overridden by -n flag" "not a valid IPv4" "$output"
+
+# Without .env, the script should still require -n and -k
+rm "${ENV_TMPDIR}/.env"
+output=$("${ENV_TMPDIR}/ddns-update.sh" -h test.example.com 1.2.3.4 2>&1 || true)
+assert_contains "No .env requires -n" "NAMESERVER is empty" "$output"
+
+# .env with quoted values should work
+cat > "${ENV_TMPDIR}/.env" <<ENVEOF
+NAMESERVER="10.0.0.1"
+KEYFILE='${DUMMY_KEY}'
+ENVEOF
+
+output=$("${ENV_TMPDIR}/ddns-update.sh" -h test.example.com 1.2.3.4 2>&1 || true)
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -qE "NAMESERVER is empty|KEYFILE is empty"; then
+    echo "  FAIL: .env with quoted values should work"
+    echo "        got: ${output}"
+    FAIL=$((FAIL + 1))
+else
+    echo "  PASS: .env with quoted values accepted"
+    PASS=$((PASS + 1))
+fi
+
+# .env with comments should be handled
+cat > "${ENV_TMPDIR}/.env" <<ENVEOF
+# This is a comment
+NAMESERVER=10.0.0.1
+
+# Another comment
+KEYFILE=${DUMMY_KEY}
+ENVEOF
+
+output=$("${ENV_TMPDIR}/ddns-update.sh" -h test.example.com 1.2.3.4 2>&1 || true)
+TOTAL=$((TOTAL + 1))
+if echo "$output" | grep -qE "NAMESERVER is empty|KEYFILE is empty"; then
+    echo "  FAIL: .env with comments should work"
+    echo "        got: ${output}"
+    FAIL=$((FAIL + 1))
+else
+    echo "  PASS: .env with comments handled correctly"
+    PASS=$((PASS + 1))
+fi
+
+# ---------------------------------------------------------------------------
 # Test: invalid nameserver address
 # ---------------------------------------------------------------------------
 echo ""

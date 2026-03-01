@@ -32,9 +32,16 @@
 # nameserver using TSIG key authentication. Can auto-detect the external IP
 # address via http://ifconfig.me or accept one on the command line.
 #
+# A .env file placed alongside the script can provide defaults for
+# NAMESERVER and KEYFILE (and any other variable) so they do not need to
+# be repeated on every invocation.  Command-line flags always win.
+#
 # Examples:
 #   # Update A record with auto-detected external IPv4:
 #   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key
+#
+#   # Same, but with NAMESERVER and KEYFILE set in .env:
+#   ddns-update.sh -h myhost.example.com
 #
 #   # Update AAAA record on a specific interface:
 #   ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key -6 -I eth0
@@ -325,6 +332,25 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Load .env file (if present) for default NAMESERVER, KEYFILE, etc.
+# Command-line arguments always override values from .env.
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    # Only allow simple KEY=VALUE assignments; skip comments and blank lines
+    while IFS='=' read -r key value; do
+        # Skip blank lines and comments
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        # Strip leading/trailing whitespace from key
+        key=$(echo "$key" | xargs)
+        # Strip surrounding quotes from value
+        value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        export "$key"="$value"
+    done < "${SCRIPT_DIR}/.env"
+fi
+
+# ---------------------------------------------------------------------------
 # Usage text
 # ---------------------------------------------------------------------------
 
@@ -340,6 +366,12 @@ BIND-compatible nameserver via nsupdate with TSIG key authentication.
 If no IP ADDRESS is given on the command line, the script queries
 http://ifconfig.me for the external address. Use -I to bind to a
 specific network interface for that lookup.
+
+A .env file in the same directory as the script can supply defaults for
+any option. For example:
+    NAMESERVER=10.0.0.1
+    KEYFILE=/path/to/Kexample.+165+12345.key
+Command-line arguments always override .env values.
 
 Options:
     -h HOSTNAME    Hostname to set the resource record for

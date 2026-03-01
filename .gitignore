@@ -4,3 +4,4 @@
 *.log
 *.conf
 .DS_Store
+.env

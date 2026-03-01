@@ -98,6 +98,31 @@ usage: ddns-update.sh [-h HOSTNAME] [-k keyfile] [-c TARGET] [-6] [-4]
 ./ddns-update.sh -h myhost.example.com -n 10.0.0.1 -k /path/to/key.conf -F
 ```
 
+## Configuration File (.env)
+
+Instead of passing `-n` and `-k` on every invocation, you can create a `.env`
+file in the same directory as the script:
+
+```bash
+NAMESERVER=10.0.0.1
+KEYFILE=/path/to/key.conf
+```
+
+Any variable that corresponds to a command-line option can be set here (e.g.
+`HOSTNAME`, `INTERFACE`, `IPCLASS`). Command-line arguments always override
+`.env` values.
+
+With a `.env` in place, the examples above simplify to:
+
+```bash
+./ddns-update.sh -h myhost.example.com
+./ddns-update.sh -h myhost.example.com -6 -I eth0
+./ddns-update.sh -h alias.example.com -c target.example.com
+```
+
+The `.env` file is gitignored by default to prevent accidental commits of
+credentials.
+
 ## TSIG Key File
 
 The key file is a standard BIND TSIG key in the format:
